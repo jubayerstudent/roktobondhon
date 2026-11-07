@@ -1,0 +1,421 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 1: Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 2 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidOpaqueDonorId(id) {
+      return id is string && id.size() >= 20 && id.size() <= 32 && id.matches('^dnr_[a-z0-9]{16,28}$');
+    }
+
+    function isValidBloodGroup(bg) {
+      return bg is string && bg in ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+    }
+
+    function isValidBargunaUpazila(districtId, upazilaId) {
+      return districtId == 'barguna' &&
+        upazilaId in ['barguna-sadar', 'amtali', 'betagi', 'bamna', 'patharghata', 'taltali'];
+    }
+
+    // RBAC Helpers via /roleAssignments/{uid}
+    function hasActiveRole(allowedRoles) {
+      return isVerifiedUser() &&
+        exists(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)).data.status == 'active' &&
+        get(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)).data.role in allowedRoles;
+    }
+
+    function isSuperAdmin() {
+      return hasActiveRole(['super_admin']);
+    }
+
+    function isDistrictStaff(districtId) {
+      return isVerifiedUser() &&
+        exists(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)).data.status == 'active' &&
+        (
+          get(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)).data.role == 'super_admin' ||
+          (
+            get(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)).data.role in ['admin', 'volunteer', 'hospital'] &&
+            get(/databases/$(database)/documents/roleAssignments/$(request.auth.uid)).data.assignedDistrictId == districtId
+          )
+        );
+    }
+
+    // 1. /users/{uid} — User Account & Write-Once activeDonorId Latch
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'activeDonorId', 'districtId', 'upazilaId', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'activeDonorId', 'districtId', 'upazilaId', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid == request.auth.uid &&
+        data.email is string && data.email.size() <= 160 &&
+        data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 80 &&
+        (data.activeDonorId == null || isValidOpaqueDonorId(data.activeDonorId)) &&
+        isValidBargunaUpazila(data.districtId, data.upazilaId) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /users/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && (request.auth.uid == uid || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow create: if isVerifiedUser() && isValidId(uid) && request.auth.uid == uid &&
+        isValidUser(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          incoming().activeDonorId == null ||
+          (
+            existsAfter(/databases/$(database)/documents/donors/$(incoming().activeDonorId)) &&
+            existsAfter(/databases/$(database)/documents/donorPrivateContacts/$(incoming().activeDonorId)) &&
+            getAfter(/databases/$(database)/documents/donorPrivateContacts/$(incoming().activeDonorId)).data.ownerUid == request.auth.uid
+          )
+        );
+      allow update: if isVerifiedUser() && isValidId(uid) && isValidUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          // Action 1: Profile metadata update without changing activeDonorId
+          (
+            request.auth.uid == uid &&
+            incoming().activeDonorId == existing().activeDonorId &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'upazilaId', 'updatedAt'])
+          ) ||
+          // Action 2: Write-Once Latch transition (null -> publicDonorId) synchronized with donor creation
+          (
+            request.auth.uid == uid &&
+            existing().activeDonorId == null &&
+            isValidOpaqueDonorId(incoming().activeDonorId) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['activeDonorId', 'updatedAt']) &&
+            existsAfter(/databases/$(database)/documents/donors/$(incoming().activeDonorId)) &&
+            existsAfter(/databases/$(database)/documents/donorPrivateContacts/$(incoming().activeDonorId)) &&
+            getAfter(/databases/$(database)/documents/donorPrivateContacts/$(incoming().activeDonorId)).data.ownerUid == request.auth.uid
+          )
+        );
+      allow delete: if false;
+    }
+
+    // 2. /roleAssignments/{uid} — RBAC Role Management with Self-Lockout Guard
+    function isValidRoleAssignment(data) {
+      return data.keys().hasAll(['uid', 'role', 'status', 'assignedDistrictId', 'assignedByUid', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'role', 'status', 'assignedDistrictId', 'assignedUpazilaId', 'assignedByUid', 'updatedAt']) &&
+        data.uid is string && data.uid.size() <= 128 &&
+        data.role in ['user', 'donor', 'requester', 'volunteer', 'hospital', 'admin', 'super_admin'] &&
+        data.status in ['active', 'revoked'] &&
+        data.assignedDistrictId is string && data.assignedDistrictId.size() <= 40 &&
+        (!('assignedUpazilaId' in data) || (data.assignedUpazilaId is string && data.assignedUpazilaId.size() <= 40)) &&
+        data.assignedByUid is string && data.assignedByUid == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    match /roleAssignments/{targetUid} {
+      allow get: if isSignedIn() && isValidId(targetUid) && (request.auth.uid == targetUid || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow create, update: if isSuperAdmin() && isValidId(targetUid) &&
+        targetUid != request.auth.uid &&
+        isValidRoleAssignment(incoming()) &&
+        incoming().uid == targetUid &&
+        incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // 3. /donors/{publicDonorId} — Public Masked Donor Directory (Opaque ID, No Raw Phone or UID)
+    function isValidPublicDonor(data) {
+      return data.keys().hasAll([
+        'publicDonorId', 'displayName', 'bloodGroup', 'districtId', 'upazilaId',
+        'areaLabel', 'maskedPhone', 'isAvailable', 'isPubliclyListed',
+        'contactPreferenceMode', 'consentPublicDirectory', 'consentContactWorkflow',
+        'consentVoluntaryNoPayment', 'consentVersion', 'consentedAt', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'publicDonorId', 'displayName', 'bloodGroup', 'districtId', 'upazilaId',
+        'areaLabel', 'maskedPhone', 'isAvailable', 'isPubliclyListed',
+        'contactPreferenceMode', 'consentPublicDirectory', 'consentContactWorkflow',
+        'consentVoluntaryNoPayment', 'consentVersion', 'consentedAt', 'createdAt', 'updatedAt'
+      ]) &&
+      isValidOpaqueDonorId(data.publicDonorId) &&
+      data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 80 &&
+      isValidBloodGroup(data.bloodGroup) &&
+      isValidBargunaUpazila(data.districtId, data.upazilaId) &&
+      data.areaLabel is string && data.areaLabel.size() >= 2 && data.areaLabel.size() <= 120 &&
+      data.maskedPhone is string && data.maskedPhone.size() >= 10 && data.maskedPhone.size() <= 48 &&
+      data.isAvailable is bool &&
+      data.isPubliclyListed is bool &&
+      data.contactPreferenceMode in ['mediated_callback', 'direct_on_approval'] &&
+      data.consentPublicDirectory is bool &&
+      data.consentContactWorkflow is bool &&
+      data.consentVoluntaryNoPayment == true &&
+      data.consentVersion == '1.0' &&
+      data.consentedAt is timestamp &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    match /donors/{publicDonorId} {
+      allow get: if isValidOpaqueDonorId(publicDonorId) &&
+        (
+          existing().isPubliclyListed == true ||
+          (isSignedIn() && get(/databases/$(database)/documents/donorPrivateContacts/$(publicDonorId)).data.ownerUid == request.auth.uid) ||
+          isDistrictStaff(existing().districtId)
+        );
+      allow list: if existing().isPubliclyListed == true;
+      allow create: if isVerifiedUser() && isValidOpaqueDonorId(publicDonorId) &&
+        publicDonorId != request.auth.uid &&
+        isValidPublicDonor(incoming()) &&
+        incoming().publicDonorId == publicDonorId &&
+        incoming().consentPublicDirectory == true &&
+        incoming().consentContactWorkflow == true &&
+        incoming().consentVoluntaryNoPayment == true &&
+        incoming().consentedAt == request.time &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeDonorId == publicDonorId &&
+        getAfter(/databases/$(database)/documents/donorPrivateContacts/$(publicDonorId)).data.ownerUid == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidOpaqueDonorId(publicDonorId) &&
+        isValidPublicDonor(incoming()) &&
+        incoming().publicDonorId == existing().publicDonorId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          (
+            get(/databases/$(database)/documents/donorPrivateContacts/$(publicDonorId)).data.ownerUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'upazilaId', 'areaLabel', 'isAvailable', 'isPubliclyListed',
+              'contactPreferenceMode', 'consentPublicDirectory', 'consentContactWorkflow', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // 4. /donorPrivateContacts/{publicDonorId} — Isolated Donor PII Vault
+    function isValidDonorPrivateContact(data) {
+      return data.keys().hasAll(['publicDonorId', 'ownerUid', 'rawPhone', 'updatedAt']) &&
+        data.keys().hasOnly(['publicDonorId', 'ownerUid', 'rawPhone', 'updatedAt']) &&
+        isValidOpaqueDonorId(data.publicDonorId) &&
+        data.ownerUid is string && data.ownerUid == request.auth.uid &&
+        data.rawPhone is string && data.rawPhone.size() >= 11 && data.rawPhone.size() <= 14 &&
+        data.rawPhone.matches('^(?:\\+?88)?01[3-9]\\d{8}$') &&
+        data.updatedAt is timestamp;
+    }
+
+    match /donorPrivateContacts/{publicDonorId} {
+      allow get: if isVerifiedUser() && isValidOpaqueDonorId(publicDonorId) &&
+        (existing().ownerUid == request.auth.uid || isSuperAdmin());
+      allow list: if false;
+      allow create: if isVerifiedUser() && isValidOpaqueDonorId(publicDonorId) &&
+        isValidDonorPrivateContact(incoming()) &&
+        incoming().publicDonorId == publicDonorId &&
+        incoming().updatedAt == request.time &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeDonorId == publicDonorId &&
+        existsAfter(/databases/$(database)/documents/donors/$(publicDonorId));
+      allow update: if isVerifiedUser() && isValidOpaqueDonorId(publicDonorId) &&
+        isValidDonorPrivateContact(incoming()) &&
+        incoming().publicDonorId == existing().publicDonorId &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().updatedAt == request.time &&
+        existing().ownerUid == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['rawPhone', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 5. /emergencyRequests/{requestId} & /emergencyRequestPrivate/{requestId}
+    function isValidEmergencyRequest(data) {
+      return data.keys().hasAll([
+        'requestId', 'patientName', 'bloodGroup', 'bagsNeeded', 'districtId',
+        'upazilaId', 'hospitalName', 'urgency', 'status', 'maskedContactPhone',
+        'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'requestId', 'patientName', 'bloodGroup', 'bagsNeeded', 'districtId',
+        'upazilaId', 'hospitalName', 'urgency', 'status', 'maskedContactPhone',
+        'reasonNote', 'createdAt', 'updatedAt'
+      ]) &&
+      isValidId(data.requestId) &&
+      data.patientName is string && data.patientName.size() >= 2 && data.patientName.size() <= 100 &&
+      isValidBloodGroup(data.bloodGroup) &&
+      data.bagsNeeded is int && data.bagsNeeded >= 1 && data.bagsNeeded <= 10 &&
+      isValidBargunaUpazila(data.districtId, data.upazilaId) &&
+      data.hospitalName is string && data.hospitalName.size() >= 3 && data.hospitalName.size() <= 150 &&
+      data.urgency in ['critical', 'urgent', 'scheduled'] &&
+      data.status in ['pending_verification', 'verified_active', 'fulfilled', 'cancelled', 'rejected'] &&
+      data.maskedContactPhone is string && data.maskedContactPhone.size() <= 48 &&
+      (!('reasonNote' in data) || (data.reasonNote is string && data.reasonNote.size() <= 240)) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    match /emergencyRequests/{requestId} {
+      allow get: if isValidId(requestId) &&
+        (
+          existing().status in ['verified_active', 'fulfilled'] ||
+          isDistrictStaff(existing().districtId) ||
+          (isSignedIn() && get(/databases/$(database)/documents/emergencyRequestPrivate/$(requestId)).data.requesterUid == request.auth.uid)
+        );
+      allow list: if existing().status in ['verified_active', 'fulfilled'] || isDistrictStaff(existing().districtId);
+      allow create: if isVerifiedUser() && isValidId(requestId) &&
+        isValidEmergencyRequest(incoming()) &&
+        incoming().requestId == requestId &&
+        incoming().status == 'pending_verification' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        getAfter(/databases/$(database)/documents/emergencyRequestPrivate/$(requestId)).data.requesterUid == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(requestId) &&
+        isValidEmergencyRequest(incoming()) &&
+        incoming().requestId == existing().requestId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        !(existing().status in ['fulfilled', 'cancelled', 'rejected']) &&
+        (
+          // Staff verification transition
+          (
+            isDistrictStaff(existing().districtId) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'urgency', 'updatedAt'])
+          ) ||
+          // Requester cancellation or fulfillment
+          (
+            get(/databases/$(database)/documents/emergencyRequestPrivate/$(requestId)).data.requesterUid == request.auth.uid &&
+            incoming().status in ['fulfilled', 'cancelled'] &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /emergencyRequestPrivate/{requestId} {
+      allow get: if isVerifiedUser() && isValidId(requestId) &&
+        (existing().requesterUid == request.auth.uid || isDistrictStaff(existing().districtId));
+      allow list: if false;
+      allow create: if isVerifiedUser() && isValidId(requestId) &&
+        incoming().keys().hasAll(['requestId', 'requesterUid', 'districtId', 'rawContactPhone', 'createdAt']) &&
+        incoming().keys().hasOnly(['requestId', 'requesterUid', 'districtId', 'rawContactPhone', 'requisitionRef', 'createdAt']) &&
+        incoming().requestId == requestId &&
+        incoming().requesterUid == request.auth.uid &&
+        incoming().districtId == 'barguna' &&
+        incoming().rawContactPhone is string && incoming().rawContactPhone.size() <= 14 &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // 6. /contactRequests/{crId} & /approvedContactShares/{crId} (24-Hour TTL + Live Consent Gate)
+    match /contactRequests/{crId} {
+      allow get: if isVerifiedUser() && isValidId(crId) &&
+        (existing().requesterId == request.auth.uid || existing().donorUserId == request.auth.uid || isDistrictStaff(existing().districtId));
+      allow list: if isVerifiedUser() &&
+        (existing().requesterId == request.auth.uid || existing().donorUserId == request.auth.uid || isDistrictStaff(existing().districtId));
+      allow create: if isVerifiedUser() && isValidId(crId) &&
+        incoming().requesterId == request.auth.uid &&
+        incoming().status == 'pending' &&
+        incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(crId) &&
+        (existing().donorUserId == request.auth.uid || isDistrictStaff(existing().districtId)) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /approvedContactShares/{crId} {
+      allow get: if isVerifiedUser() && isValidId(crId) &&
+        existing().requesterId == request.auth.uid &&
+        existing().revoked == false &&
+        request.time < existing().expiresAt &&
+        get(/databases/$(database)/documents/donors/$(existing().publicDonorId)).data.isPubliclyListed == true &&
+        get(/databases/$(database)/documents/donors/$(existing().publicDonorId)).data.consentContactWorkflow == true;
+      allow list: if false;
+      allow create: if isVerifiedUser() && isValidId(crId) &&
+        incoming().donorOwnerUid == request.auth.uid &&
+        incoming().revoked == false &&
+        incoming().createdAt == request.time &&
+        incoming().expiresAt <= request.time + duration.value(24, 'h');
+      allow update: if isVerifiedUser() && isValidId(crId) &&
+        (existing().donorOwnerUid == request.auth.uid || isSuperAdmin()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['revoked', 'updatedAt']) &&
+        incoming().revoked == true &&
+        incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // 7. Reference & Admin Collections (/districts, /upazilas, /volunteers, /hospitals, /organizations, /notifications, /auditLogs)
+    match /districts/{districtId} {
+      allow get, list: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /upazilas/{upazilaId} {
+      allow get, list: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /volunteers/{volId} {
+      allow get, list: if existing().status == 'approved' || isDistrictStaff(existing().districtId);
+      allow write: if isSuperAdmin();
+    }
+
+    match /hospitals/{hospId} {
+      allow get, list: if existing().status == 'verified' || isDistrictStaff(existing().districtId);
+      allow write: if isSuperAdmin();
+    }
+
+    match /organizations/{orgId} {
+      allow get, list: if existing().status == 'approved' || isDistrictStaff(existing().districtId);
+      allow write: if isSuperAdmin();
+    }
+
+    match /notifications/{notifId} {
+      allow get, list: if isVerifiedUser() && existing().recipientUid == request.auth.uid;
+      allow update: if isVerifiedUser() && existing().recipientUid == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt']) &&
+        incoming().updatedAt == request.time;
+      allow create, delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if isSuperAdmin();
+      allow create: if isVerifiedUser() && isValidId(logId) &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // 8. Server-Managed AI Quota Ledgers (Denied to Direct Client SDK Writes)
+    match /aiGlobalQuotas/{dateKey} {
+      allow get: if isSuperAdmin();
+      allow list, write: if false;
+    }
+
+    match /aiUserQuotas/{userDateKey} {
+      allow get: if isVerifiedUser() && existing().uid == request.auth.uid;
+      allow list, write: if false;
+    }
+
+    match /aiIdempotency/{idempotencyKey} {
+      allow read, write: if false;
+    }
+  }
+}

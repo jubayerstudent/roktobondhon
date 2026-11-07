@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bloodGrad" x1="16" y1="6" x2="48" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E53935" />
+      <stop offset="100%" stop-color="#B71C1C" />
+    </linearGradient>
+  </defs>
+  <!-- Blood drop symbol inspired by official RoktoBondhon logo -->
+  <path d="M32 4C32 4 12 27.5 12 42C12 53.0457 20.9543 62 32 62C43.0457 62 52 53.0457 52 42C52 27.5 32 4 32 4Z" fill="url(#bloodGrad)" />
+  <!-- Highlight reflection -->
+  <path d="M29 12C23 21 17 31 16.5 40C16.2 43.5 18.5 37 22 29C25.5 21 29.5 14 29 12Z" fill="#FFFFFF" fill-opacity="0.32" />
+  <!-- Inner white heart with ECG pulse -->
+  <path d="M32 48.5C32 48.5 20.5 41 20.5 33.5C20.5 29.8 23.4 27 26.8 27C29 27 30.9 28.2 32 29.9C33.1 28.2 35 27 37.2 27C40.6 27 43.5 29.8 43.5 33.5C43.5 41 32 48.5 32 48.5Z" fill="#FFFFFF" />
+  <path d="M23 35.5H27.5L29.2 31.5L31.8 40L34.2 30L36 35.5H41" stroke="#E53935" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

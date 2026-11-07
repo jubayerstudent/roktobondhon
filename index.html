@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        try {
+          var currentFetch = window.fetch ? window.fetch.bind(window) : undefined;
+          var winDesc = Object.getOwnPropertyDescriptor(window, 'fetch');
+          if (winDesc && winDesc.get && !winDesc.set && winDesc.configurable) {
+            Object.defineProperty(window, 'fetch', {
+              configurable: true,
+              enumerable: true,
+              get: function () {
+                return currentFetch;
+              },
+              set: function (val) {
+                if (typeof val === 'function') {
+                  currentFetch = val;
+                }
+              },
+            });
+          }
+          var protoDesc =
+            typeof Window !== 'undefined'
+              ? Object.getOwnPropertyDescriptor(Window.prototype, 'fetch')
+              : null;
+          if (protoDesc && protoDesc.get && !protoDesc.set && protoDesc.configurable) {
+            Object.defineProperty(Window.prototype, 'fetch', {
+              configurable: true,
+              enumerable: true,
+              get: function () {
+                return currentFetch;
+              },
+              set: function (val) {
+                if (typeof val === 'function') {
+                  currentFetch = val;
+                }
+              },
+            });
+          }
+        } catch (_e) {
+          // Ignore descriptor lock errors
+        }
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            var msg = String((event && event.message) || '');
+            var file = String((event && event.filename) || '');
+            if (
+              msg.indexOf('Cannot set property fetch') !== -1 ||
+              file.indexOf('chrome-extension://') === 0
+            ) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+            }
+          },
+          true
+        );
+      })();
+    </script>
+    <title>রক্তবন্ধন (RoktoBondhon) — এক ব্যাগ রক্ত, বাঁচাতে পারে একটি প্রাণ</title>
+    <meta
+      name="description"
+      content="রক্তবন্ধন (RoktoBondhon) বরগুনা জেলার ৬টি উপজেলায় জরুরি রক্তদাতা অনুসন্ধান, স্বেচ্ছাসেবী রক্তদাতা নিবন্ধন ও রক্তের অনুরোধ সমন্বয়ের একটি আধুনিক মানবিক স্বাস্থ্য প্ল্যাটফর্ম। এক ব্যাগ রক্ত, বাঁচাতে পারে একটি প্রাণ।"
+    />
+    <meta
+      name="keywords"
+      content="রক্তবন্ধন, RoktoBondhon, রক্তদান, জরুরি রক্ত, বরগুনা ব্লাড ডোনার, রক্তদাতা খুঁজুন, Barguna Blood Donor, Blood Donation Bangladesh"
+    />
+    <meta property="og:site_name" content="রক্তবন্ধন (RoktoBondhon)" />
+    <meta property="og:title" content="রক্তবন্ধন (RoktoBondhon) — এক ব্যাগ রক্ত, বাঁচাতে পারে একটি প্রাণ" />
+    <meta
+      property="og:description"
+      content="বরগুনা জেলার ৬টি উপজেলায় (সদর, আমতলী, বেতাগী, বামনা, পাথরঘাটা ও তালতলী) স্বেচ্ছাসেবী রক্তদাতা অনুসন্ধান ও জরুরি রক্ত সহায়তার বিশ্বস্ত ডিজিটাল প্ল্যাটফর্ম।"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="bn_BD" />
+    <meta property="og:image" content="/assets/aistudio/RoktoBondhon_Blood_Donation_Logo_e425e45b.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="রক্তবন্ধন (RoktoBondhon) — এক ব্যাগ রক্ত, বাঁচাতে পারে একটি প্রাণ" />
+    <meta
+      name="twitter:description"
+      content="বরগুনা জেলার ৬টি উপজেলায় স্বেচ্ছাসেবী রক্তদাতা অনুসন্ধান ও জরুরি রক্ত সহায়তার আধুনিক ডিজিটাল প্ল্যাটফর্ম।"
+    />
+    <meta name="twitter:image" content="/assets/aistudio/RoktoBondhon_Blood_Donation_Logo_e425e45b.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "রক্তবন্ধন (RoktoBondhon)",
+        "alternateName": "RoktoBondhon Blood Donation Platform",
+        "slogan": "এক ব্যাগ রক্ত, বাঁচাতে পারে একটি প্রাণ।",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "All",
+        "inLanguage": ["bn-BD", "en"],
+        "description": "বরগুনা জেলার ৬টি উপজেলায় স্বেচ্ছাসেবী রক্তদাতা অনুসন্ধান, রক্তের গ্রুপ সামঞ্জস্যতা যাচাই এবং জরুরি রক্তের অনুরোধ সমন্বয়ের মানবিক ডিজিটাল প্ল্যাটফর্ম।",
+        "areaServed": {
+          "@type": "AdministrativeArea",
+          "name": "Barguna District, Bangladesh"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "BDT"
+        }
+      }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-[#F8FAFC] text-[#1E293B] antialiased selection:bg-[#E53935]/15 selection:text-[#B71C1C]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

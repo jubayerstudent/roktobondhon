@@ -1,0 +1,321 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --brand-red: #E53935;
+    --brand-dark-red: #B71C1C;
+    --brand-soft-red: #FEF2F2;
+    --surface-bg: #F8FAFC;
+    --surface-card: #FFFFFF;
+    --text-primary: #1E293B;
+    --text-body: #475569;
+    --text-supporting: #64748B;
+    --status-success: #16A34A;
+    --status-warning: #F59E0B;
+    --font-bn: 'Hind Siliguri', 'Noto Sans Bengali', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-en: 'Inter', 'Hind Siliguri', 'Noto Sans Bengali', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-bn);
+    background-color: #F8FAFC;
+    color: #1E293B;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
+  }
+
+  body {
+    font-family: var(--font-bn);
+    background-color: #F8FAFC;
+    color: #475569;
+    overflow-x: hidden;
+    line-height: 1.7;
+    font-size: clamp(1rem, 0.25vw + 0.92rem, 1.0625rem);
+  }
+
+  /* Primary Bengali Font System: Hind Siliguri -> Noto Sans Bengali -> Inter */
+  .font-bn {
+    font-family: var(--font-bn);
+    line-height: 1.75;
+    letter-spacing: 0em;
+    word-spacing: 0.02em;
+  }
+
+  .font-bn h1,
+  .font-bn h2,
+  .font-bn h3,
+  .font-bn h4 {
+    font-family: var(--font-bn);
+    color: #1E293B;
+    letter-spacing: 0em;
+  }
+
+  .font-bn p {
+    line-height: 1.75;
+    letter-spacing: 0em;
+  }
+
+  /* English & Number Font System: Inter -> Hind Siliguri -> Noto Sans Bengali */
+  .font-en {
+    font-family: var(--font-en);
+    line-height: 1.65;
+    letter-spacing: -0.005em;
+  }
+
+  .font-en h1,
+  .font-en h2,
+  .font-en h3,
+  .font-en h4 {
+    font-family: var(--font-en);
+    color: #1E293B;
+    letter-spacing: -0.015em;
+  }
+
+  /* Clean Inter Tabular Number System (No extra monospace font mixing) */
+  .font-mono-num {
+    font-family: 'Inter', 'Hind Siliguri', 'Noto Sans Bengali', sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: 0em;
+  }
+
+  /* Accessible keyboard focus indicators */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #E53935;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* ============================================================================
+   * COMPLETE RESPONSIVE TYPOGRAPHY SCALE (CSS clamp() System in @layer components)
+   * Placed inside @layer components so Tailwind utility classes (@layer utilities)
+   * such as text-white, text-[#E53935], font-bold, font-semibold, and py-*
+   * cleanly compose with and override base defaults without specificity conflicts.
+   *
+   * Strict Hierarchy Specification:
+   * 1. Hero Heading:         40–48px desktop (2.5rem–2.875rem) | 32px (2rem) mobile
+   * 2. Main Section Heading: 28–34px desktop (1.75rem–2.125rem)| 24px (1.5rem) mobile
+   * 3. Subsection Heading:   22–26px desktop (1.375rem–1.625rem)| 20px (1.25rem) mobile
+   * 4. Card Heading:         18–22px desktop (1.125rem–1.375rem)| 18px (1.125rem) mobile
+   * 5. Body Text:            16–17px (1rem–1.0625rem)
+   * 6. Supporting Text:      14–15px (0.875rem–0.9375rem)
+   * 7. Buttons:              15–16px (0.9375rem–1rem)
+   * 8. Small Labels:         13–14px (0.8125rem–0.875rem)
+   * ============================================================================ */
+
+  .rb-hero-heading {
+    font-size: clamp(2rem, 1.48rem + 2.3vw, 2.875rem);
+    font-weight: 700;
+    line-height: 1.36;
+    color: #1E293B;
+    letter-spacing: 0em;
+    overflow-wrap: break-word;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-section-heading {
+    font-size: clamp(1.5rem, 1.15rem + 1.55vw, 2.125rem);
+    font-weight: 700;
+    line-height: 1.4;
+    color: #1E293B;
+    letter-spacing: 0em;
+    overflow-wrap: break-word;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-subsection-heading {
+    font-size: clamp(1.25rem, 1.05rem + 0.9vw, 1.625rem);
+    font-weight: 600;
+    line-height: 1.44;
+    color: #1E293B;
+    letter-spacing: 0em;
+    overflow-wrap: break-word;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-card-heading {
+    font-size: clamp(1.125rem, 0.98rem + 0.65vw, 1.375rem);
+    font-weight: 600;
+    line-height: 1.48;
+    color: #1E293B;
+    letter-spacing: 0em;
+    overflow-wrap: break-word;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-body-text {
+    font-size: clamp(1rem, 0.95rem + 0.2vw, 1.0625rem);
+    font-weight: 400;
+    line-height: 1.75;
+    color: #475569;
+    letter-spacing: 0em;
+    overflow-wrap: break-word;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-support-text {
+    font-size: clamp(0.875rem, 0.83rem + 0.18vw, 0.9375rem);
+    font-weight: 500;
+    line-height: 1.65;
+    color: #64748B;
+    letter-spacing: 0em;
+    overflow-wrap: break-word;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-btn-text {
+    font-size: clamp(0.9375rem, 0.89rem + 0.18vw, 1rem);
+    font-weight: 600;
+    line-height: 1.5;
+    letter-spacing: 0em;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .rb-label-text {
+    font-size: clamp(0.8125rem, 0.77rem + 0.18vw, 0.875rem);
+    font-weight: 500;
+    line-height: 1.58;
+    color: #64748B;
+    letter-spacing: 0em;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  /* Mobile & Tablet Viewport Line-Height Expansion for Hind Siliguri Multi-Line Wrapping */
+  @media (max-width: 768px) {
+    .rb-hero-heading {
+      line-height: 1.44;
+    }
+
+    .rb-section-heading {
+      line-height: 1.48;
+    }
+
+    .rb-subsection-heading {
+      line-height: 1.52;
+    }
+
+    .rb-card-heading {
+      line-height: 1.54;
+    }
+
+    .rb-body-text {
+      line-height: 1.8;
+    }
+
+    .rb-support-text {
+      line-height: 1.7;
+    }
+
+    .rb-btn-text {
+      line-height: 1.55;
+    }
+
+    .rb-label-text {
+      line-height: 1.64;
+    }
+  }
+}
+
+/* Prevent vertical clipping of Hind Siliguri ascenders/descenders if truncate is used */
+.font-bn .truncate {
+  line-height: 1.62;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Subtle GPU-composited micro-interactions & animations */
+@keyframes rbFadeUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes rbPulseSoft {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.88;
+    transform: scale(1.02);
+  }
+}
+
+.rb-animate-in {
+  animation: rbFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rb-animate-delay-1 {
+  animation: rbFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.rb-animate-delay-2 {
+  animation: rbFadeUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
+}
+
+.rb-card-hover {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rb-card-hover:hover {
+  transform: translate3d(0, -2px, 0);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06),
+    0 4px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+.rb-btn-transition {
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rb-btn-transition:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+/* Strict Reduced-Motion Support for Accessibility & Low-End Android Devices */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .rb-card-hover:hover {
+    transform: none !important;
+  }
+
+  .rb-btn-transition:active:not(:disabled) {
+    transform: none !important;
+  }
+}

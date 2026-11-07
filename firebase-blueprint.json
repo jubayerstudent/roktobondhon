@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Authenticated user account and write-once donor ownership latch.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "displayName": { "type": "string", "maxLength": 80 },
+        "activeDonorId": { "type": "string", "maxLength": 40, "pattern": "^dnr_[a-z0-9]{16,28}$" },
+        "districtId": { "type": "string", "maxLength": 40 },
+        "upazilaId": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "districtId", "upazilaId", "createdAt", "updatedAt"]
+    },
+    "RoleAssignment": {
+      "title": "RoleAssignment",
+      "description": "Role-Based Access Control (RBAC) assignment document keyed by user UID.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "role": {
+          "type": "string",
+          "enum": ["user", "donor", "requester", "volunteer", "hospital", "admin", "super_admin"]
+        },
+        "status": { "type": "string", "enum": ["active", "revoked"] },
+        "assignedDistrictId": { "type": "string", "maxLength": 40 },
+        "assignedUpazilaId": { "type": "string", "maxLength": 40 },
+        "assignedByUid": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "status", "assignedDistrictId", "assignedByUid", "updatedAt"]
+    },
+    "PublicDonor": {
+      "title": "PublicDonor",
+      "description": "Publicly searchable donor profile keyed by opaque publicDonorId (no raw phone or Firebase UID exposed publicly).",
+      "type": "object",
+      "properties": {
+        "publicDonorId": { "type": "string", "maxLength": 40, "pattern": "^dnr_[a-z0-9]{16,28}$" },
+        "displayName": { "type": "string", "maxLength": 80 },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+        },
+        "districtId": { "type": "string", "maxLength": 40 },
+        "upazilaId": { "type": "string", "maxLength": 40 },
+        "areaLabel": { "type": "string", "maxLength": 120 },
+        "maskedPhone": { "type": "string", "maxLength": 48 },
+        "isAvailable": { "type": "boolean" },
+        "isPubliclyListed": { "type": "boolean" },
+        "contactPreferenceMode": {
+          "type": "string",
+          "enum": ["mediated_callback", "direct_on_approval"]
+        },
+        "consentPublicDirectory": { "type": "boolean" },
+        "consentContactWorkflow": { "type": "boolean" },
+        "consentVoluntaryNoPayment": { "type": "boolean" },
+        "consentVersion": { "type": "string", "maxLength": 16 },
+        "consentedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "publicDonorId",
+        "displayName",
+        "bloodGroup",
+        "districtId",
+        "upazilaId",
+        "areaLabel",
+        "maskedPhone",
+        "isAvailable",
+        "isPubliclyListed",
+        "contactPreferenceMode",
+        "consentPublicDirectory",
+        "consentContactWorkflow",
+        "consentVoluntaryNoPayment",
+        "consentVersion",
+        "consentedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DonorPrivateContact": {
+      "title": "DonorPrivateContact",
+      "description": "Isolated PII document storing the donor ownerUid and raw phone number.",
+      "type": "object",
+      "properties": {
+        "publicDonorId": { "type": "string", "maxLength": 40, "pattern": "^dnr_[a-z0-9]{16,28}$" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "rawPhone": { "type": "string", "maxLength": 20, "pattern": "^(?:\\+?88)?01[3-9]\\d{8}$" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["publicDonorId", "ownerUid", "rawPhone", "updatedAt"]
+    },
+    "EmergencyRequest": {
+      "title": "EmergencyRequest",
+      "description": "Public/verified emergency blood request with masked phone number.",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string", "maxLength": 64 },
+        "patientName": { "type": "string", "maxLength": 100 },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+        },
+        "bagsNeeded": { "type": "number" },
+        "districtId": { "type": "string", "maxLength": 40 },
+        "upazilaId": { "type": "string", "maxLength": 40 },
+        "hospitalName": { "type": "string", "maxLength": 150 },
+        "urgency": { "type": "string", "enum": ["critical", "urgent", "scheduled"] },
+        "status": {
+          "type": "string",
+          "enum": ["pending_verification", "verified_active", "fulfilled", "cancelled", "rejected"]
+        },
+        "maskedContactPhone": { "type": "string", "maxLength": 48 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "requestId",
+        "patientName",
+        "bloodGroup",
+        "bagsNeeded",
+        "districtId",
+        "upazilaId",
+        "hospitalName",
+        "urgency",
+        "status",
+        "maskedContactPhone",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Private user account document and write-once activeDonorId latch."
+    },
+    "/roleAssignments/{uid}": {
+      "schema": "RoleAssignment",
+      "description": "RBAC role assignment keyed by Firebase UID."
+    },
+    "/donors/{publicDonorId}": {
+      "schema": "PublicDonor",
+      "description": "Publicly searchable donor directory keyed by opaque publicDonorId."
+    },
+    "/donorPrivateContacts/{publicDonorId}": {
+      "schema": "DonorPrivateContact",
+      "description": "Strictly isolated donor PII (ownerUid and raw phone number)."
+    },
+    "/emergencyRequests/{requestId}": {
+      "schema": "EmergencyRequest",
+      "description": "Emergency blood requests board."
+    }
+  }
+}

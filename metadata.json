@@ -1,0 +1,6 @@
+{
+  "name": "RoktoBondhon (রক্তবন্ধন) — Blood Donation & Emergency Assistance Platform",
+  "description": "A modern, district-based digital blood donation management and emergency blood assistance platform launching in Barguna District, Bangladesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
